@@ -2,7 +2,7 @@ import os
 import base64
 import io
 import logging
-from typing import Optional
+from contextlib import asynccontextmanager
 
 import httpx
 from fastapi import FastAPI, UploadFile, File, HTTPException
@@ -22,7 +22,14 @@ PROMPT = os.getenv(
 )
 NEGATIVE_PROMPT = os.getenv("NEGATIVE_PROMPT", "ugly, deformed, blurry, low quality, bad anatomy")
 
-app = FastAPI(title="MySketch Proxy")
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    yield
+    await http_client.aclose()
+
+app = FastAPI(title="MySketch Proxy", lifespan=lifespan)
+# Shared HTTP client for Fooocus API calls
+http_client = httpx.AsyncClient(timeout=180)
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
@@ -38,10 +45,16 @@ async def health():
 
 @app.post("/dorisuy")
 async def dorisuy(file: UploadFile = File(...)):
+    MAX_FILE_SIZE = 10 * 1024 * 1024  # 10 MB
     image_data = await file.read()
+    if len(image_data) > MAX_FILE_SIZE:
+        raise HTTPException(status_code=413, detail="File too large (max 10 MB)")
     image_b64 = base64.b64encode(image_data).decode()
 
-    img = Image.open(io.BytesIO(image_data))
+    try:
+        img = Image.open(io.BytesIO(image_data))
+    except Exception:
+        raise HTTPException(status_code=400, detail="Invalid image file")
     if img.size != (512, 512):
         img = img.resize((512, 512), Image.LANCZOS)
         buf = io.BytesIO()
@@ -60,13 +73,12 @@ async def dorisuy(file: UploadFile = File(...)):
     }
 
     logger.info("Sending to Fooocus: %s", FOOOCUS_URL)
-    async with httpx.AsyncClient(timeout=180) as client:
-        try:
-            resp = await client.post(f"{FOOOCUS_URL}/v2/generate", json=payload)
-            resp.raise_for_status()
-        except httpx.HTTPError as e:
-            logger.error("Fooocus error: %s", e)
-            raise HTTPException(status_code=502, detail=f"Fooocus API error: {e}")
+    try:
+        resp = await http_client.post(f"{FOOOCUS_URL}/v2/generate", json=payload)
+        resp.raise_for_status()
+    except httpx.HTTPError as e:
+        logger.error("Fooocus error: %s", e)
+        raise HTTPException(status_code=502, detail=f"Fooocus API error: {e}")
 
     data = resp.json()
     logger.info("Fooocus response keys: %s", list(data.keys()))
@@ -74,7 +86,7 @@ async def dorisuy(file: UploadFile = File(...)):
     try:
         result_b64 = data["images"][0]["base64"]
     except (KeyError, IndexError, TypeError):
-        logger.error("Unexpected Fooocus response: %s", data)
+        logger.error("Unexpected Fooocus response keys: %s", list(data.keys()))
         raise HTTPException(status_code=502, detail="Unexpected response from Fooocus")
 
     result_bytes = base64.b64decode(result_b64)

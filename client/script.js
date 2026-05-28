@@ -7,6 +7,9 @@ const resultImg = document.getElementById('result');
 const resultWrapper = document.getElementById('resultWrapper');
 const loading = document.getElementById('loading');
 
+// Configuration
+const SERVER_URL = 'http://localhost:8000';   // или задать через window.__SERVER_URL__
+
 // Drawing state
 let isDrawing = false;
 let lastX = 0, lastY = 0;
@@ -85,8 +88,15 @@ clearBtn.addEventListener('click', () => {
   ctx.fillRect(0, 0, canvas.width, canvas.height);
   ctx.strokeStyle = 'black';
   history = [];
-  saveState();
+  // Save initial empty state
+  history.push(canvas.toDataURL());
+  undoBtn.disabled = true;       // <-- отключаем кнопку
   resultWrapper.style.display = 'none';
+  // Revoke result URL too
+  if (resultImg.src) {
+    URL.revokeObjectURL(resultImg.src);
+    resultImg.src = '';
+  }
 });
 
 undoBtn.addEventListener('click', () => {
@@ -113,7 +123,6 @@ submitBtn.addEventListener('click', async () => {
     const formData = new FormData();
     formData.append('file', blob, 'sketch.png');
 
-    const SERVER_URL = 'http://localhost:8000';
     const response = await fetch(`${SERVER_URL}/dorisuy`, {
       method: 'POST',
       body: formData,
@@ -121,6 +130,10 @@ submitBtn.addEventListener('click', async () => {
 
     if (!response.ok) throw new Error(`Server error: ${response.status}`);
     const imgBlob = await response.blob();
+    // Revoke previous URL to prevent memory leak
+    if (resultImg.src) {
+      URL.revokeObjectURL(resultImg.src);
+    }
     resultImg.src = URL.createObjectURL(imgBlob);
     resultWrapper.style.display = 'block';
   } catch (err) {
