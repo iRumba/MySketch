@@ -1,0 +1,32 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>MySketch — Дорисуй</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <div class="container">
+    <h1>✏️ MySketch</h1>
+    <p>Нарисуй что-нибудь и нажми <strong>«Дорисуй»</strong></p>
+    <div class="canvas-wrapper">
+      <canvas id="canvas" width="512" height="512"></canvas>
+    </div>
+    <div class="controls">
+      <button id="clearBtn">Очистить</button>
+      <button id="submitBtn" class="primary">✨ Дорисуй</button>
+      <button id="undoBtn" class="secondary" disabled>↩ Отменить</button>
+    </div>
+    <div class="result-wrapper" id="resultWrapper" style="display:none;">
+      <h2>Результат:</h2>
+      <img id="result" alt="Дорисованное изображение">
+    </div>
+    <div id="loading" style="display:none;">
+      <div class="spinner"></div>
+      <p>Генерирую...</p>
+    </div>
+  </div>
+  <script src="script.js"></script>
+</body>
+</html>
