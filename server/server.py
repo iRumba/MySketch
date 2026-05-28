@@ -8,6 +8,7 @@ import httpx
 from fastapi import FastAPI, UploadFile, File, HTTPException
 from fastapi.responses import Response
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.staticfiles import StaticFiles
 from PIL import Image
 
 logging.basicConfig(level=logging.INFO)
@@ -92,6 +93,11 @@ async def dorisuy(file: UploadFile = File(...)):
     result_bytes = base64.b64decode(result_b64)
     return Response(content=result_bytes, media_type="image/png")
 
+
+# === Serve client static files ===
+CLIENT_DIR = os.path.join(os.path.dirname(__file__), "..", "client")
+if os.path.isdir(CLIENT_DIR):
+    app.mount("/", StaticFiles(directory=CLIENT_DIR, html=True), name="client")
 
 if __name__ == "__main__":
     import uvicorn
