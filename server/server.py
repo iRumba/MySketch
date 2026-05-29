@@ -1,6 +1,7 @@
 import base64
 import os
 import logging
+import argparse
 from contextlib import asynccontextmanager
 
 import httpx
@@ -13,7 +14,13 @@ logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger("mysketch")
 
 # === CONFIG ===
-FOOOCUS_URL = os.getenv("FOOOCUS_URL", "http://localhost:8888")
+def get_fooocus_url() -> str:
+    """Get Gradio/Colab API URL.
+
+    Precedence: --fooocus-url CLI arg > FOOOCUS_URL env var > default
+    """
+    return os.environ.get("FOOOCUS_URL", "http://localhost:8888")
+
 PROMPT = os.getenv(
     "PROMPT",
     "finish this sketch, make it a complete cute illustration, "
@@ -67,11 +74,12 @@ async def dorisuy(file: UploadFile = File(...)):
         ]
     }
 
-    logger.info("Sending to Gradio API: %s", FOOOCUS_URL)
+    url = get_fooocus_url()
+    logger.info("Sending to Gradio API: %s", url)
 
     try:
         resp = await http_client.post(
-            f"{FOOOCUS_URL}/api/predict",
+            f"{url}/api/predict",
             json=payload,
             headers={"Content-Type": "application/json"}
         )
@@ -104,5 +112,15 @@ if os.path.isdir(CLIENT_DIR):
     app.mount("/", StaticFiles(directory=CLIENT_DIR, html=True), name="client")
 
 if __name__ == "__main__":
+    parser = argparse.ArgumentParser(description="MySketch - AI sketch completion proxy")
+    parser.add_argument(
+        "-u", "--fooocus-url",
+        help="Gradio/Colab API URL (e.g. https://xxxx.gradio.live)"
+    )
+    args = parser.parse_args()
+
+    if args.fooocus_url:
+        os.environ["FOOOCUS_URL"] = args.fooocus_url
+
     import uvicorn
     uvicorn.run(app, host="0.0.0.0", port=8000)
